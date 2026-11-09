@@ -1,0 +1,58 @@
+# PostgreSQL + backend (port 8080) + frontend (port 3000).
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: admission
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data   # data survives `docker compose down`
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d admission"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      DB_CONNECTION: "Host=db;Port=5432;Database=admission;Username=postgres;Password=postgres;Maximum Pool Size=200"
+      HOLD_DURATION_SECONDS: ${HOLD_DURATION_SECONDS:-600}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      # URL the *browser* uses to reach the backend. Change it without rebuilding.
+      API_URL: ${API_URL:-http://localhost:8080}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  # Run with: docker compose run --rm frontend-tests
+  frontend-tests:
+    build:
+      context: ./frontend
+      target: tests
+    profiles: ["test"]
+
+  # Run with: docker compose run --rm backend-tests
+  backend-tests:
+    build:
+      context: ./backend
+      target: tests
+    profiles: ["test"]
+    environment:
+      DB_CONNECTION: "Host=db;Port=5432;Database=admission;Username=postgres;Password=postgres;Maximum Pool Size=200"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

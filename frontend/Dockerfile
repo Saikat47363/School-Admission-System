@@ -5,6 +5,10 @@ RUN npm install
 COPY . .
 RUN npm run build
 
+# `docker compose run --rm frontend-tests` uses this stage
+FROM build AS tests
+CMD ["npm", "test"]
+
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
